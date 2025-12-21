@@ -15,11 +15,33 @@ export class UrlService {
      * Caso de Uso: Crear una nueva URL corta
      */
     async shortenUrl(request: ShortenUrlRequest): Promise<ShortenUrlResponse> {
-        const { originalUrl } = request;
+        const { originalUrl, customAlias } = request;
+        
+        let shortCode: string;
+
+        // --- LÓGICA DE ALIAS PERSONALIZADO ---
+        if (customAlias) {
+            // 1. Verificamos si el usuario mandó un alias
+            // (Opcional: Aquí podrías validar que no tenga espacios ni caracteres raros)
+            
+            // 2. Verificamos si YA EXISTE en la base de datos
+            const exists = await this.urlRepository.findByCode(customAlias);
+            
+            if (exists) {
+                // Si ya existe, lanzamos un error (El middleware de error lo atrapará)
+                const error: any = new Error('El alias personalizado ya está en uso ⛔');
+                error.statusCode = 409; // 409 Conflict
+                throw error;
+            }
+
+            shortCode = customAlias;
+        } else {
+            // 3. Si no mandó alias, generamos uno aleatorio como siempre
+            shortCode = nanoid(6);
+        }
 
         // 1. Generar ID único (NanoID es ideal para esto)
-        const shortCode = nanoid(6); 
-
+    
         // 2. Crear Entidad de Dominio
         const newUrl = new Url(originalUrl, shortCode);
 
