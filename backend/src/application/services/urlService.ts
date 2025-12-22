@@ -5,6 +5,7 @@ import type { ShortenUrlRequest} from '../models/requests/ShortenUrlRequest.js';
 import type { ShortenUrlResponse } from '../models/responses/ShortenUrlResponse.js'; // DTOs
 import type { UrlStatsResponse } from '../models/responses/UrlStatsResponse.js'; // DTOs
 import redisClient from '../../infrastructure/database/redis.js'; // Infraestructura (Caché)
+import { AppError } from '../errors/AppError.js';
 
 export class UrlService {
     
@@ -25,15 +26,10 @@ export class UrlService {
             // (Opcional: Aquí podrías validar que no tenga espacios ni caracteres raros)
             
             // 2. Verificamos si YA EXISTE en la base de datos
-            const exists = await this.urlRepository.findByCode(customAlias);
-            
             if (exists) {
-                // Si ya existe, lanzamos un error (El middleware de error lo atrapará)
-                const error: any = new Error('El alias personalizado ya está en uso ⛔');
-                error.statusCode = 409; // 409 Conflict
-                throw error;
+              // ¡Así de limpio! El middleware se encarga del resto.
+              throw new AppError('El alias personalizado ya está en uso ⛔', 409);
             }
-
             shortCode = customAlias;
         } else {
             // 3. Si no mandó alias, generamos uno aleatorio como siempre

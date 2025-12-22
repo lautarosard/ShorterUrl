@@ -12,8 +12,7 @@ export class UrlController {
         // Si usas un middleware de validación (Zod/Joi) antes, esto sobra.
         // Si no, validamos que exista la URL.
         if (!body.originalUrl) {
-        res.status(400).json({ error: 'originalUrl is required' });
-        return;
+            throw new AppError('El campo originalUrl es obligatorio', 400);
         }
 
         const result = await this.urlService.shortenUrl(body);
@@ -34,8 +33,7 @@ export class UrlController {
         const originalUrl = await this.urlService.getOriginalUrl(code);
 
         if (!originalUrl) {
-        res.status(404).json({ error: 'URL not found' });
-        return;
+            throw new AppError('url not found', 400);
         }
 
         res.redirect(302, originalUrl);

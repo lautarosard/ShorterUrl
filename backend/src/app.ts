@@ -15,6 +15,7 @@ export const createApp = (urlRouter: express.Router): Application => {
     app.get('/health', (req, res) => {
         res.json({ status: 'OK', message: 'Shortener API is running' });
     });
-
+    app.use(errorHandler);
+    
     return app;
 };

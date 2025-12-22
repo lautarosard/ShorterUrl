@@ -1,10 +1,13 @@
 import { Router } from 'express';
 import { UrlController } from '../controllers/urlController.js';
+import { asyncHandler } from '../middlewares/asyncHandler.js'; // <--- Importar
 
-// Recibimos el controlador ya instanciado (Inversión de Control real)
 export const createUrlRouter = (urlController: UrlController): Router => {
     const router = Router();
-    router.post('/shorten', urlController.shorten.bind(urlController));
-    router.get('/:code', urlController.redirect.bind(urlController));
+
+    // Envolvemos con asyncHandler
+    router.post('/shorten', asyncHandler(urlController.shorten));
+    router.get('/:code', asyncHandler(urlController.redirect));
+
     return router;
 };
