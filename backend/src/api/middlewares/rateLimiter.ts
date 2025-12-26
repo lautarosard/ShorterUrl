@@ -18,18 +18,24 @@ export const rateLimiter = async (req: Request, res: Response, next: NextFunctio
 
     // 2. INCREMENTAR CONTADOR EN REDIS
     // Pista: Busca en la doc de node-redis el método .incr(key)
-    const requestCount = await key.incr();
+    const requestCount = await redisClient.incr(key);
 
     // 3. SI ES LA PRIMERA VEZ (requestCount === 1)
     //    Configurar la expiración para que el contador se resetee solo.
     //    Pista: Busca el método .expire(key, segundos)
-    // if (requestCount === 1) { ... }
+    if (requestCount === 1) { 
+      await redisClient.expire(key, WINDOW_SIZE_IN_SECONDS);
+
+    }
 
     // 4. VERIFICAR LÍMITE
     // Si requestCount es mayor a MAX_REQUESTS...
     //    Lanzamos un error 429
     //    throw new AppError('Too many requests, please try again later.', 429);
-
+    if(requestCount>MAX_REQUESTS ){
+      const ttl=await redisClient.ttl(key);
+      throw new AppError('Too many requests, please try again '+'in '+ ttl+'s', 429);
+    }
     // 5. DEJAR PASAR
     // Si no superó el límite, dejamos que siga al controller
     next();
