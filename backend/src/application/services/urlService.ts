@@ -5,8 +5,7 @@ import type { ShortenUrlRequest} from '../models/requests/ShortenUrlRequest.js';
 import type { ShortenUrlResponse } from '../models/responses/ShortenUrlResponse.js'; // DTOs
 import type { UrlStatsResponse } from '../models/responses/UrlStatsResponse.js'; // DTOs
 import redisClient from '../../infrastructure/database/redis.js'; // Infraestructura (Caché)
-import { AppError } from '../errors/AppError.js';
-
+import { AppError } from '../models/errors/appError.js'
 export class UrlService {
     
     // Inyectamos la dependencia del Repositorio (Inversión de Control)

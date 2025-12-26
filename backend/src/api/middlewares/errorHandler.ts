@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { AppError } from '../../application/errors/AppError.js'; // Ajusta la ruta si es necesario
+import { AppError } from '../../application/models/errors/appError.js'; // Ajusta la ruta si es necesario
 
 export const errorHandler = (err: any, req: Request, res: Response, next: NextFunction) => {
   
