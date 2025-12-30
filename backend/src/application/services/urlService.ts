@@ -6,10 +6,15 @@ import type { ShortenUrlResponse } from '../models/responses/ShortenUrlResponse.
 import type { UrlStatsResponse } from '../models/responses/UrlStatsResponse.js'; // DTOs
 import redisClient from '../../infrastructure/database/redis.js'; // Infraestructura (Caché)
 import { AppError } from '../models/errors/appError.js'
-export class UrlService {
+import type { IStatisticRepository } from '../../domain/Irepositories/iStatisticRepository.js';
+import type { IUrlService } from '../interfaces/IurlService.js';
+export class UrlService implements IUrlService {
 
   // Inyectamos la dependencia del Repositorio (Inversión de Control)
-  constructor(private readonly urlRepository: IUrlRepository) { }
+  constructor(
+    private readonly urlRepository: IUrlRepository,
+    private readonly statisticRepository: IStatisticRepository
+  ) { }
 
   /**
    * Caso de Uso: Crear una nueva URL corta
