@@ -1,16 +1,16 @@
 import { nanoid } from 'nanoid';
-import { Url } from '../../domain/entities/Url.js'; // Entidad del Dominio
-import type { IUrlRepository } from '../../domain/Irepositories/iUrlRepository.js'; // Puerto
-import type { ShortenUrlRequest } from '../models/requests/ShortenUrlRequest.js'; // DTOs
-import type { ShortenUrlResponse } from '../models/responses/ShortenUrlResponse.js'; // DTOs
-import type { UrlStatsResponse } from '../models/responses/UrlStatsResponse.js'; // DTOs
-import redisClient from '../../infrastructure/database/redis.js'; // Infraestructura (Caché)
-import { AppError } from '../models/errors/appError.js'
+import { Url } from '../../domain/entities/Url.js';
+import type { IUrlRepository } from '../../domain/Irepositories/iUrlRepository.js';
+import type { ShortenUrlRequest } from '../models/requests/ShortenUrlRequest.js';
+import type { ShortenUrlResponse } from '../models/responses/ShortenUrlResponse.js';
+import redisClient from '../../infrastructure/database/redis.js';
+import { AppError } from '../models/errors/appError.js';
 import type { IStatisticRepository } from '../../domain/Irepositories/iStatisticRepository.js';
-import type { IUrlService } from '../interfaces/IurlService.js';
+import type { IUrlService } from '../interfaces/IurlService.js'; // Ojo con mayúsculas/minúsculas en el nombre del archivo
+import { Statistic } from "../../domain/entities/Statistic.js";
+
 export class UrlService implements IUrlService {
 
-  // Inyectamos la dependencia del Repositorio (Inversión de Control)
   constructor(
     private readonly urlRepository: IUrlRepository,
     private readonly statisticRepository: IStatisticRepository
@@ -26,33 +26,27 @@ export class UrlService implements IUrlService {
 
     // --- LÓGICA DE ALIAS PERSONALIZADO ---
     if (customAlias) {
-      // 1. Verificamos si el usuario mandó un alias
-      // (Opcional: Aquí podrías validar que no tenga espacios ni caracteres raros)
-
-      // 2. Verificamos si YA EXISTE en la base de datos
+      // 1. Verificamos si YA EXISTE en la base de datos
+      const exists = await this.urlRepository.findByCode(customAlias);
       if (exists) {
-        // ¡Así de limpio! El middleware se encarga del resto.
         throw new AppError('El alias personalizado ya está en uso ⛔', 409);
       }
+
       shortCode = customAlias;
     } else {
-      // 3. Si no mandó alias, generamos uno aleatorio como siempre
+      // 2. Si no mandó alias, generamos uno aleatorio
       shortCode = nanoid(6);
     }
 
-    // 1. Generar ID único (NanoID es ideal para esto)
-
-    // 2. Crear Entidad de Dominio
+    // 3. Crear Entidad de Dominio
     const newUrl = new Url(originalUrl, shortCode);
 
-    // 3. Persistir en Base de Datos (A través del Puerto)
+    // 4. Persistir en Base de Datos
     await this.urlRepository.save(newUrl);
 
-    // 4. Guardar en Caché (Write-Through o actualización proactiva)
-    // Expiración: 7 días (604800 segundos) para no llenar la RAM de Redis con basura vieja
+    // 5. Guardar en Caché (7 días)
     await redisClient.set(shortCode, originalUrl, { EX: 604800 });
 
-    // 5. Mapear Entidad -> Response DTO
     return {
       shortCode: newUrl.shortCode,
       originalUrl: newUrl.originalUrl,
@@ -61,31 +55,44 @@ export class UrlService implements IUrlService {
   }
 
   /**
-      * Caso de Uso: Obtener la URL original (para redirección)
-      * Retorna string directo porque es lo único que necesitamos para el 'res.redirect'
-  */
-  async getOriginalUrl(shortCode: string): Promise<string | null> {
+   * Caso de Uso: Obtener la URL original (para redirección)
+   * AHORA RECIBE IP Y USER AGENT
+   */
+  async getOriginalUrl(shortCode: string, ip: string, userAgent?: string): Promise<string | null> {
 
-    // 1. ESTRATEGIA DE CACHÉ: Intentar leer de Redis primero (Rendimiento extremo)
+    // 1. Caché
     const cachedUrl = await redisClient.get(shortCode);
-
     if (cachedUrl) {
-      // console.log(`⚡ Cache Hit para ${shortCode}`);
+      // Registramos visita aunque sea caché (Fire & Forget)
+      this.logVisit(shortCode, ip, userAgent);
       return cachedUrl;
     }
 
-    // 2. FALLBACK: Si no está en caché, ir a la Base de Datos (Lento)
+    // 2. Base de Datos
     const urlEntity = await this.urlRepository.findByCode(shortCode);
-
     if (!urlEntity) return null;
 
-    // 3. Lógica "Fire and Forget": Incrementar clicks sin esperar (para no bloquear la respuesta)
-    // No usamos await aquí intencionalmente para responder más rápido al usuario
-    this.urlRepository.incrementClicks(shortCode).catch(err => console.error(err));
+    // 3. Registrar "Hits"
+    // A. Contador simple (Legacy)
+    this.urlRepository.incrementClicks(shortCode).catch(console.error);
 
-    // 4. REPOBLAR CACHÉ: Guardar en Redis para la próxima petición
+    // B. Log detallado (Nuevo)
+    this.logVisit(shortCode, ip, userAgent);
+
+    // 4. Repoblar Caché
     await redisClient.set(shortCode, urlEntity.originalUrl, { EX: 604800 });
 
     return urlEntity.originalUrl;
+  }
+
+  // Método privado auxiliar
+  private async logVisit(code: string, ip: string, userAgent?: string): Promise<void> {
+    try {
+      // Si userAgent es undefined, enviamos 'unknown' o lo dejamos pasar si la entidad lo permite
+      const visit = new Statistic(code, ip, userAgent || 'unknown');
+      await this.statisticRepository.save(visit);
+    } catch (error) {
+      console.error('Error saving statistic:', error);
+    }
   }
 }

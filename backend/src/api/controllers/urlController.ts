@@ -1,7 +1,8 @@
 import type { Request, Response } from 'express';
 import type { ShortenUrlRequest } from '../../application/models/requests/ShortenUrlRequest.js';
-import type { IUrlService } from '../../application/interfaces/IurlService.js';
+// Asegúrate de que el archivo se llame 'IUrlService.ts' (con mayúsculas)
 import { AppError } from '../../application/models/errors/appError.js';
+import type { IUrlService } from '../../application/interfaces/IurlService.js';
 export class UrlController {
 
   constructor(private readonly urlService: IUrlService) { }
@@ -9,8 +10,7 @@ export class UrlController {
   shorten = async (req: Request, res: Response): Promise<void> => {
     const body: ShortenUrlRequest = req.body;
 
-    // Si usas un middleware de validación (Zod/Joi) antes, esto sobra.
-    // Si no, validamos que exista la URL.
+    // Validación básica
     if (!body.originalUrl) {
       throw new AppError('El campo originalUrl es obligatorio', 400);
     }
@@ -20,20 +20,23 @@ export class UrlController {
   };
 
   redirect = async (req: Request, res: Response): Promise<void> => {
-    // CORRECCIÓN 1: Extraemos code
     const { code } = req.params;
 
-    // CORRECCIÓN 2: Validamos explícitamente. 
-    // Si 'code' es undefined, cortamos aquí. TypeScript ahora sabrá que abajo es string.
     if (!code) {
-      res.status(400).json({ error: 'Code is required' });
-      return;
+      throw new AppError('Code is required', 400);
     }
 
-    const originalUrl = await this.urlService.getOriginalUrl(code);
+    // --- CORRECCIÓN PRINCIPAL ---
+    // Ahora pasamos la IP y el User-Agent que pide el servicio
+    const originalUrl = await this.urlService.getOriginalUrl(
+      code,
+      req.ip || req.socket.remoteAddress || 'unknown', // Intentamos obtener la IP
+      req.headers['user-agent'] // Obtenemos el navegador/dispositivo
+    );
 
     if (!originalUrl) {
-      throw new AppError('url not found', 400);
+      // Usamos 404 para "No encontrado" (es más semántico que 400)
+      throw new AppError('URL not found', 404);
     }
 
     res.redirect(302, originalUrl);
