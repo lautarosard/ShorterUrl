@@ -1,7 +1,9 @@
 export class Statistic {
-  urlCode: string;
-  ip: string;
-  userAgent: string;
-  createdAt: Date;
+  constructor(
+    public urlCode: string,
+    public ip: string,
+    public userAgent: string | undefined,
+    public createdAt: Date = new Date()
+  ) { }
 }
 
